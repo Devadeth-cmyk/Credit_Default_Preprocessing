@@ -1,0 +1,93 @@
+import pickle
+import torch
+import numpy as np
+
+from src.config import (
+    ONNX_MODEL_PATH,
+    SCALER_PATH,
+    DEFAULT_THRESHOLD,
+)
+
+from src.model import CreditDefaultANN
+
+from src.preprocessing import preprocess_input
+
+
+# ============================================================
+# LOAD SCALER
+# ============================================================
+
+with open(SCALER_PATH, "rb") as file:
+    scaler = pickle.load(file)
+
+# ============================================================
+# LOAD MODEL
+# ============================================================
+
+model = CreditDefaultANN()
+
+state_dict = torch.load(
+    MODEL_PATH,
+    map_location=DEVICE,
+    weights_only=True
+)
+
+model.load_state_dict(state_dict)
+
+model.to(DEVICE)
+
+model.eval()
+
+# ============================================================
+# PREDICTION
+# ============================================================
+
+def predict_customer(data: dict):
+
+    # Preprocess
+    processed = preprocess_input(
+        data,
+        scaler
+    )
+
+
+    # DataFrame → PyTorch tensor
+    tensor = torch.tensor(
+        processed.values,
+        dtype=torch.float32
+    ).to(DEVICE)
+
+
+    # Prediction
+    with torch.no_grad():
+
+        probability = model(
+            tensor
+        ).item()
+
+
+    # Classification
+    prediction = int(
+        probability >= DEFAULT_THRESHOLD
+    )
+
+
+    # Risk
+    if probability < 0.30:
+
+        risk = "LOW"
+
+    elif probability < 0.50:
+
+        risk = "MEDIUM"
+
+    else:
+
+        risk = "HIGH"
+
+
+    return {
+        "probability": probability,
+        "prediction": prediction,
+        "risk": risk,
+    }
