@@ -8,13 +8,21 @@ from pathlib import Path
 # Project root directory
 BASE_DIR = Path(__file__).resolve().parent.parent
 
-# Model directory
+# Directory containing trained model artifacts
 MODEL_DIR = BASE_DIR / "models"
 
-# Saved model files
-MODEL_PATH = MODEL_DIR / "credit_default_model.pth"
+# Trained Keras ANN
+MODEL_PATH = MODEL_DIR / "credit_default_model.keras"
+
+# Saved StandardScaler
 SCALER_PATH = MODEL_DIR / "scaler.pkl"
-CONFIG_PATH = MODEL_DIR / "model_config.pkl"
+
+# Saved feature information from the notebook
+FEATURE_COLUMNS_PATH = MODEL_DIR / "feature_columns.pkl"
+
+# Saved preprocessing configuration from the notebook
+PREPROCESSING_CONFIG_PATH = MODEL_DIR / "preprocessing_config.pkl"
+
 
 # ============================================================
 # TARGET
@@ -27,8 +35,8 @@ TARGET_COLUMN = "default payment next month"
 # FEATURES
 # ============================================================
 
-# These are the exact 23 features used by the ANN.
-# ID is intentionally NOT included.
+# The notebook drops ID before training.
+# Therefore the ANN receives exactly these 23 features.
 
 FEATURE_COLUMNS = [
     "LIMIT_BAL",
@@ -61,7 +69,8 @@ FEATURE_COLUMNS = [
 # NUMERICAL FEATURES
 # ============================================================
 
-# These are the exact columns standardized in the notebook.
+# These are the columns that the notebook scales
+# using StandardScaler.
 
 NUMERICAL_COLUMNS = [
     "LIMIT_BAL",
@@ -85,6 +94,8 @@ NUMERICAL_COLUMNS = [
 # CATEGORICAL / DISCRETE FEATURES
 # ============================================================
 
+# These columns are NOT standardized in the notebook.
+
 CATEGORICAL_COLUMNS = [
     "SEX",
     "EDUCATION",
@@ -103,15 +114,16 @@ CATEGORICAL_COLUMNS = [
 # ============================================================
 
 # The notebook converts probability to class using 0.5.
+
 DEFAULT_THRESHOLD = 0.50
 
 
 # ============================================================
-# RISK LEVELS
+# OPTIONAL APPLICATION RISK LEVELS
 # ============================================================
 
 # These are application-level labels.
-# They are NOT additional model outputs.
+# They are NOT part of the trained ANN.
 
 LOW_RISK_THRESHOLD = 0.30
 HIGH_RISK_THRESHOLD = 0.50

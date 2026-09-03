@@ -1,14 +1,14 @@
 import pickle
-import torch
-import numpy as np
+
+from tensorflow.keras.models import load_model
 
 from src.config import (
-    ONNX_MODEL_PATH,
+    MODEL_PATH,
     SCALER_PATH,
     DEFAULT_THRESHOLD,
+    LOW_RISK_THRESHOLD,
+    HIGH_RISK_THRESHOLD,
 )
-
-from src.model import CreditDefaultANN
 
 from src.preprocessing import preprocess_input
 
@@ -20,64 +20,73 @@ from src.preprocessing import preprocess_input
 with open(SCALER_PATH, "rb") as file:
     scaler = pickle.load(file)
 
+
 # ============================================================
-# LOAD MODEL
+# LOAD KERAS MODEL
 # ============================================================
 
-model = CreditDefaultANN()
-
-state_dict = torch.load(
+model = load_model(
     MODEL_PATH,
-    map_location=DEVICE,
-    weights_only=True
+    compile=False
 )
 
-model.load_state_dict(state_dict)
-
-model.to(DEVICE)
-
-model.eval()
 
 # ============================================================
 # PREDICTION
 # ============================================================
 
-def predict_customer(data: dict):
+def predict_customer(data: dict) -> dict:
+    """
+    Predict credit card default probability for one customer.
 
-    # Preprocess
+    Parameters
+    ----------
+    data : dict
+        Raw customer information.
+
+    Returns
+    -------
+    dict
+        Probability, prediction class, and application risk level.
+    """
+
+    # --------------------------------------------------------
+    # Preprocess input
+    # --------------------------------------------------------
+
     processed = preprocess_input(
         data,
         scaler
     )
 
+    # --------------------------------------------------------
+    # Generate probability
+    # --------------------------------------------------------
 
-    # DataFrame → PyTorch tensor
-    tensor = torch.tensor(
-        processed.values,
-        dtype=torch.float32
-    ).to(DEVICE)
+    probability = float(
+        model.predict(
+            processed,
+            verbose=0
+        )[0][0]
+    )
 
+    # --------------------------------------------------------
+    # Convert probability to class
+    # --------------------------------------------------------
 
-    # Prediction
-    with torch.no_grad():
-
-        probability = model(
-            tensor
-        ).item()
-
-
-    # Classification
     prediction = int(
         probability >= DEFAULT_THRESHOLD
     )
 
+    # --------------------------------------------------------
+    # Application-level risk classification
+    # --------------------------------------------------------
 
-    # Risk
-    if probability < 0.30:
+    if probability < LOW_RISK_THRESHOLD:
 
         risk = "LOW"
 
-    elif probability < 0.50:
+    elif probability < HIGH_RISK_THRESHOLD:
 
         risk = "MEDIUM"
 
@@ -85,6 +94,9 @@ def predict_customer(data: dict):
 
         risk = "HIGH"
 
+    # --------------------------------------------------------
+    # Return result
+    # --------------------------------------------------------
 
     return {
         "probability": probability,

@@ -1,20 +1,6 @@
-import pickle
-
 import streamlit as st
-import pandas as pd
 
-from tensorflow.keras.models import load_model
-
-from src.config import (
-    MODEL_PATH,
-    SCALER_PATH,
-    FEATURE_COLUMNS,
-    DEFAULT_THRESHOLD,
-    LOW_RISK_THRESHOLD,
-    HIGH_RISK_THRESHOLD,
-)
-
-from src.preprocessing import preprocess_input
+from src.prediction import predict_customer
 
 
 # ============================================================
@@ -26,51 +12,6 @@ st.set_page_config(
     page_icon="💳",
     layout="wide"
 )
-
-
-# ============================================================
-# LOAD MODEL
-# ============================================================
-
-@st.cache_resource
-def load_prediction_model():
-
-    model = load_model(MODEL_PATH)
-
-    return model
-
-
-# ============================================================
-# LOAD SCALER
-# ============================================================
-
-@st.cache_resource
-def load_scaler():
-
-    with open(SCALER_PATH, "rb") as file:
-        scaler = pickle.load(file)
-
-    return scaler
-
-
-# ============================================================
-# LOAD EVERYTHING
-# ============================================================
-
-try:
-
-    model = load_prediction_model()
-    scaler = load_scaler()
-
-except Exception as e:
-
-    st.error(
-        "Unable to load the trained model or scaler."
-    )
-
-    st.exception(e)
-
-    st.stop()
 
 
 # ============================================================
@@ -97,6 +38,7 @@ st.subheader("👤 Customer Information")
 
 col1, col2, col3 = st.columns(3)
 
+
 with col1:
 
     limit_bal = st.number_input(
@@ -105,6 +47,7 @@ with col1:
         value=200000.0,
         step=5000.0
     )
+
 
 with col2:
 
@@ -115,6 +58,7 @@ with col2:
         value=35,
         step=1
     )
+
 
 with col3:
 
@@ -128,6 +72,7 @@ with col3:
 
 col1, col2 = st.columns(2)
 
+
 with col1:
 
     education = st.selectbox(
@@ -140,6 +85,7 @@ with col1:
             4: "Others"
         }[x]
     )
+
 
 with col2:
 
@@ -162,10 +108,11 @@ st.subheader("📊 Repayment Status")
 
 st.caption(
     "Use the dataset's payment-status encoding. "
-    "-2 to 8 are valid values."
+    "Valid values are -2 to 8."
 )
 
 pay_col1, pay_col2, pay_col3 = st.columns(3)
+
 
 with pay_col1:
 
@@ -185,6 +132,7 @@ with pay_col1:
         step=1
     )
 
+
 with pay_col2:
 
     pay_3 = st.number_input(
@@ -202,6 +150,7 @@ with pay_col2:
         value=0,
         step=1
     )
+
 
 with pay_col3:
 
@@ -230,6 +179,7 @@ st.subheader("💰 Bill Amounts")
 
 bill_col1, bill_col2, bill_col3 = st.columns(3)
 
+
 with bill_col1:
 
     bill_amt1 = st.number_input(
@@ -246,6 +196,7 @@ with bill_col1:
         step=1000.0
     )
 
+
 with bill_col2:
 
     bill_amt3 = st.number_input(
@@ -261,6 +212,7 @@ with bill_col2:
         value=43000.0,
         step=1000.0
     )
+
 
 with bill_col3:
 
@@ -287,6 +239,7 @@ st.subheader("💵 Previous Payment Amounts")
 
 payment_col1, payment_col2, payment_col3 = st.columns(3)
 
+
 with payment_col1:
 
     pay_amt1 = st.number_input(
@@ -303,6 +256,7 @@ with payment_col1:
         step=500.0
     )
 
+
 with payment_col2:
 
     pay_amt3 = st.number_input(
@@ -318,6 +272,7 @@ with payment_col2:
         value=3000.0,
         step=500.0
     )
+
 
 with payment_col3:
 
@@ -341,15 +296,10 @@ with payment_col3:
 # ============================================================
 
 input_data = {
-
     "LIMIT_BAL": limit_bal,
-
     "SEX": sex,
-
     "EDUCATION": education,
-
     "MARRIAGE": marriage,
-
     "AGE": age,
 
     "PAY_0": pay_0,
@@ -396,57 +346,13 @@ if predict_button:
 
     try:
 
-        # ----------------------------------------------------
-        # Preprocess
-        # ----------------------------------------------------
+        result = predict_customer(input_data)
 
-        processed_data = preprocess_input(
-            input_data,
-            scaler
-        )
-
-
-        # ----------------------------------------------------
-        # Model prediction
-        # ----------------------------------------------------
-
-        probability = model.predict(
-            processed_data,
-            verbose=0
-        )[0][0]
-
+        probability = result["probability"]
+        prediction = result["prediction"]
+        risk = result["risk"]
 
         probability_percent = probability * 100
-
-
-        # ----------------------------------------------------
-        # Classification
-        # ----------------------------------------------------
-
-        prediction = int(
-            probability >= DEFAULT_THRESHOLD
-        )
-
-
-        # ----------------------------------------------------
-        # Risk category
-        # ----------------------------------------------------
-
-        if probability < LOW_RISK_THRESHOLD:
-
-            risk_level = "LOW RISK"
-            risk_color = "green"
-
-        elif probability < HIGH_RISK_THRESHOLD:
-
-            risk_level = "MEDIUM RISK"
-            risk_color = "orange"
-
-        else:
-
-            risk_level = "HIGH RISK"
-            risk_color = "red"
-
 
         # ----------------------------------------------------
         # Results
@@ -458,6 +364,11 @@ if predict_button:
 
         result_col1, result_col2, result_col3 = st.columns(3)
 
+
+        # ----------------------------------------------------
+        # Probability
+        # ----------------------------------------------------
+
         with result_col1:
 
             st.metric(
@@ -465,29 +376,43 @@ if predict_button:
                 f"{probability_percent:.2f}%"
             )
 
+
+        # ----------------------------------------------------
+        # Prediction
+        # ----------------------------------------------------
+
         with result_col2:
 
             if prediction == 1:
 
-                st.error("⚠️ DEFAULT PREDICTED")
+                st.error(
+                    "⚠️ DEFAULT PREDICTED"
+                )
 
             else:
 
-                st.success("✅ NO DEFAULT PREDICTED")
+                st.success(
+                    "✅ NO DEFAULT PREDICTED"
+                )
+
+
+        # ----------------------------------------------------
+        # Risk
+        # ----------------------------------------------------
 
         with result_col3:
 
-            if risk_color == "green":
+            if risk == "LOW":
 
-                st.success(risk_level)
+                st.success("LOW RISK")
 
-            elif risk_color == "orange":
+            elif risk == "MEDIUM":
 
-                st.warning(risk_level)
+                st.warning("MEDIUM RISK")
 
             else:
 
-                st.error(risk_level)
+                st.error("HIGH RISK")
 
 
         # ----------------------------------------------------
@@ -497,7 +422,7 @@ if predict_button:
         st.write("Probability of Default")
 
         st.progress(
-            float(probability)
+            probability
         )
 
 
